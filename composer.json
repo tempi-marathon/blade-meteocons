@@ -1,0 +1,43 @@
+{
+    "name": "tempi-marathon/blade-meteocons",
+    "description": "A package to easily make use of Meteocons in your Laravel Blade views.",
+    "keywords": ["Blade", "Meteocons", "Laravel", "Weather", "Icons"],
+    "homepage": "https://github.com/tempi-marathon/blade-meteocons",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "tempi-marathon"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "blade-ui-kit/blade-icons": "^1.6",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "phpunit/phpunit": "^10.5|^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "TempiMarathon\\BladeMeteocons\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TempiMarathon\\BladeMeteocons\\BladeMeteoconsServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

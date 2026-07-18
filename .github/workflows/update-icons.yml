@@ -1,0 +1,91 @@
+name: Update Icons
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Check for upstream updates
+        id: versions
+        run: |
+          set -euo pipefail
+
+          CURRENT_SVG=$(jq -r '."@meteocons/svg"' .meteocons-version)
+          CURRENT_STATIC=$(jq -r '."@meteocons/svg-static"' .meteocons-version)
+          LATEST_SVG=$(npm view @meteocons/svg version)
+          LATEST_STATIC=$(npm view @meteocons/svg-static version)
+
+          echo "current_svg=${CURRENT_SVG}" >> "$GITHUB_OUTPUT"
+          echo "current_static=${CURRENT_STATIC}" >> "$GITHUB_OUTPUT"
+          echo "latest_svg=${LATEST_SVG}" >> "$GITHUB_OUTPUT"
+          echo "latest_static=${LATEST_STATIC}" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_SVG" = "$LATEST_SVG" ] && [ "$CURRENT_STATIC" = "$LATEST_STATIC" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream updates."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Updates available: svg ${CURRENT_SVG} -> ${LATEST_SVG}, svg-static ${CURRENT_STATIC} -> ${LATEST_STATIC}"
+          fi
+
+      - name: Install dependencies and regenerate icons
+        if: steps.versions.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+
+          npm install "@meteocons/svg@${{ steps.versions.outputs.latest_svg }}" "@meteocons/svg-static@${{ steps.versions.outputs.latest_static }}"
+          composer install --prefer-dist --no-interaction --no-progress
+          vendor/bin/blade-icons-generate
+
+          node -e "
+            const fs = require('fs');
+            const svg = require('./node_modules/@meteocons/svg/package.json');
+            const svgStatic = require('./node_modules/@meteocons/svg-static/package.json');
+            fs.writeFileSync('.meteocons-version', JSON.stringify({
+              '@meteocons/svg': svg.version,
+              '@meteocons/svg-static': svgStatic.version,
+            }, null, 2) + '\n');
+          "
+
+      - name: Create Pull Request
+        if: steps.versions.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update Meteocons to svg ${{ steps.versions.outputs.latest_svg }} / svg-static ${{ steps.versions.outputs.latest_static }}"
+          title: "Update Meteocons icons (svg ${{ steps.versions.outputs.latest_svg }}, svg-static ${{ steps.versions.outputs.latest_static }})"
+          body: |
+            Automated upstream icon update.
+
+            | Package | From | To |
+            | --- | --- | --- |
+            | `@meteocons/svg` | `${{ steps.versions.outputs.current_svg }}` | `${{ steps.versions.outputs.latest_svg }}` |
+            | `@meteocons/svg-static` | `${{ steps.versions.outputs.current_static }}` | `${{ steps.versions.outputs.latest_static }}` |
+
+            Please review for renamed or removed icons before merging.
+          branch: bots/update-meteocons
+          delete-branch: true
